@@ -1,13 +1,13 @@
 
 #define FILEPATHMAXLENGTH 255
-#define BUFFERSIZE 100
+#define BUFFERSIZE 1024
 
 #include <cstdlib>
 #include <iostream>
-#include <windows.h>
 #include <WinSock2.h>
 
 #pragma comment (lib, "ws2_32.lib")
+#pragma warning(disable: 4996)
 
 using namespace std;
 
@@ -65,6 +65,8 @@ int MainMenu()
 		Sleep(1000);
 
 		system("cls");
+
+		return num;
 	}
 }
 
@@ -94,7 +96,7 @@ void UDPFileServer()
 	serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 	serverAddress.sin_port = htons(serverPort);
 
-	serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_UDP);
+	serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
 	if (serverSocket == INVALID_SOCKET)
 	{
@@ -145,8 +147,6 @@ void UDPFileServer()
 		if ((file = fopen(requestFile, "rb")) == NULL)
 		{
 			cout << "Cannot find file!";
-			socket.send("ERROR", 6);
-			socket.disconnect();
 			continue;
 		}
 
@@ -155,14 +155,13 @@ void UDPFileServer()
 		fseek(file, 0, SEEK_SET);
 
 		_snprintf(buff, sizeof(buff), "%d", fileSize);
-		socket.sendTo(buff, sizeof(char) * BUFFERSIZE, sourceAddr, sourcePort);
+		sendto(serverSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
 
 		cout << "Start file tranfer" << endl;
-		socket.send("START", 6);
 
 		while ((readBytes = fread(buff, sizeof(char), BUFFERSIZE, file)) > 0)
 		{
-			socket.send(buff, readBytes);
+			sendto(serverSocket, buff, readBytes, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
 			totalSendBytes += readBytes;
 			cout << "File transfer progress : " << totalSendBytes << "B" << endl;
 		}
@@ -177,77 +176,103 @@ void UDPFileServer()
 
 void UDPFileClient()
 {
-	char checkConnect[CHECKSIZE];
 	char requestFile[FILEPATHMAXLENGTH];
-	char desFile[FILEPATHMAXLENGTH];
-	string serverAddr;
-	unsigned short serverPort;
+	char saveFile[FILEPATHMAXLENGTH];
 	char buff[BUFFERSIZE];
+	int connectPort = 0;
 
 	system("cls");
 	Sleep(1000);
 
-	try
+	WSADATA socketData;
+	SOCKET clientSocket;
+	SOCKADDR_IN serverAddress;
+	SOCKADDR_IN clientAddress;
+
+	if (WSAStartup(0x202, &socketData) == SOCKET_ERROR)
 	{
-		UDPSocket socket;
-
-		cout << "Input server address => ";
-		cin >> serverAddr;
-		cout << "Input server port number (1024 ~ 49151) => ";
-		cin >> serverPort;
-
-		cout << "Wait for connect server...";
-
-		socket.sendTo(checkConnect, CHECKSIZE, serverAddr, serverPort);
-
-		cout << "Connect server!" << endl;
-		cout << "Server Address:Port = " << serverAddr << ":" << serverPort << endl;
-
-		cout << "Input want to receive file path => ";
-		cin >> requestFile;
-		cout << "Input want to save file path => ";
-		cin >> desFile;
-
-		socket.sendTo(requestFile, FILEPATHMAXLENGTH, serverAddr, serverPort);
-
-		FILE* file;
-		int readBytes;
-		int totalRecvBytes = 0;
-		int fileTotalBytes = 0;
-
-		if ((file = fopen(desFile, "wb")) == NULL)
-		{
-			cout << "Cannot create file!" << endl;
-			return;
-		}
-
-		cout << "Start file tranfer" << endl;
-
-		socket.recvFrom(buff, sizeof(char) * BUFFERSIZE, serverAddr, serverPort);
-		fileTotalBytes = atoi(buff);
-
-		while (totalRecvBytes < fileTotalBytes)
-		{
-			readBytes = socket.recvFrom(buff, sizeof (char) * BUFFERSIZE, serverAddr, serverPort);
-
-			fwrite(buff, sizeof(char), readBytes, file);
-			totalRecvBytes += readBytes;
-			cout << "File transfer progress : " << totalRecvBytes << "B" << endl;
-		}
-
-		fflush(file);
-		fclose(file);
-
-		cout << "File transfer complete!" << endl;
-
-		Sleep(1000);
-
-		system("cls");
+		cout << "Socket startup fail!" << endl;
+		WSACleanup();
+		exit(0);
 	}
-	catch (SocketException& e)
+
+	cout << "Input server port number => ";
+	cin >> connectPort;
+
+	clientAddress.sin_family = AF_INET;
+	clientAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+	clientAddress.sin_port = htons(connectPort);
+
+	clientSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+	if (clientSocket == INVALID_SOCKET)
 	{
-		cerr << e.what() << endl;
+		cout << "Cannot create socket!";
+		closesocket(clientSocket);
+		WSACleanup();
+		exit(0);
 	}
+
+	cout << "Server connect success!" << endl;
+	cout << "Server port number : " << serverPort << endl;
+
+	int serverAddressSize = sizeof(serverAddress);
+
+	sendto(clientSocket, "Connect", 8, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
+
+	cout << "Input want to receive file => ";
+	cin >> requestFile;
+
+	cout << "Input want to save file => ";
+	cin >> saveFile;
+
+	cout << "Request File : " << requestFile << endl;
+	cout << "Save File : " << saveFile << endl;
+
+	sendto(clientSocket, requestFile, FILEPATHMAXLENGTH, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
+
+	FILE* file;
+	int fileSize = 0;
+	int readBytes;
+	int bufferSize = 0;
+	int totalRecvBytes = 0;
+
+	if ((file = fopen(saveFile, "wb")) == NULL)
+	{
+		cout << "Cannot create file!";
+	}
+
+	recvfrom(clientSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & serverAddress, &serverAddressSize);
+
+	fileSize = atol(buff);
+
+	cout << "Start file tranfer" << endl;
+
+	while (totalRecvBytes < fileSize)
+	{
+		if ((fileSize - totalRecvBytes) > BUFFERSIZE)
+			bufferSize = BUFFERSIZE;
+		else
+			bufferSize = fileSize - totalRecvBytes;
+
+		readBytes = recvfrom(clientSocket, buff, bufferSize, 0, (struct sockaddr*) & serverAddress, &serverAddressSize);
+		fwrite(buff, sizeof(char), readBytes, file);
+		totalRecvBytes += readBytes;
+		cout << "File transfer progress : " << totalRecvBytes << "B" << endl;
+	}
+
+	cout << "File transfer complete!" << endl;
+
+	fflush(file);
+	fclose(file);
+
+	Sleep(1000);
+
+	closesocket(clientSocket);
+	WSACleanup();
+
+	system("cls");
+
 }
 
 int main(int argc, char* argv[])
