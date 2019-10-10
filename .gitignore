@@ -1,6 +1,8 @@
 UDPFileTransfer/x64/*
 UDPFileTransfer/Debug/*
 UDPFileTransfer/Release/*
+UDPFileTransfer/.vs/*
 TCPChat/x64/*
 TCPChat/Debug/*
 TCPChat/Release/*
+TCPChat/.vs/*
