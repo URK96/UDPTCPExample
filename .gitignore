@@ -1,1 +1,6 @@
 UDPFileTransfer/x64/*
+UDPFileTransfer/Debug/*
+UDPFileTransfer/Release/*
+TCPChat/x64/*
+TCPChat/Debug/*
+TCPChat/Release/*

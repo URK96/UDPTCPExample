@@ -115,7 +115,7 @@ void UDPFileServer()
 	}
 
 	cout << "Server create success! Open server now..." << endl;
-	cout << "Server port number : " << serverPort << endl;
+	cout << "Server port number : " << htons(serverAddress.sin_port) << endl;
 
 	while (1)
 	{
@@ -123,14 +123,8 @@ void UDPFileServer()
 
 		int clientAddressSize = sizeof(clientAddress);
 
-		while (1)
-		{
-			recvfrom(serverSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & clientAddress, &clientAddressSize);
+		recvfrom(serverSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & clientAddress, &clientAddressSize);
 			
-			if (strcmp(buff, "Connect") == 0)
-				break;
-		}
-
 		cout << "Connect client!" << endl;
 		cout << "Client Address:Port = " << inet_ntoa(clientAddress.sin_addr) << ":" << htons(clientAddress.sin_port) << endl;
 		cout << "Wait for client file request..." << endl;
@@ -168,7 +162,7 @@ void UDPFileServer()
 
 		cout << "File transfer complete!" << endl;
 
-		Sleep(1000);
+		Sleep(2000);
 
 		system("cls");
 	}
@@ -214,7 +208,7 @@ void UDPFileClient()
 	}
 
 	cout << "Server connect success!" << endl;
-	cout << "Server port number : " << serverPort << endl;
+	cout << "Server port number : " << htons(clientAddress.sin_port) << endl;
 
 	int serverAddressSize = sizeof(serverAddress);
 
@@ -240,6 +234,7 @@ void UDPFileClient()
 	if ((file = fopen(saveFile, "wb")) == NULL)
 	{
 		cout << "Cannot create file!";
+		return;
 	}
 
 	recvfrom(clientSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & serverAddress, &serverAddressSize);
@@ -266,7 +261,7 @@ void UDPFileClient()
 	fflush(file);
 	fclose(file);
 
-	Sleep(1000);
+	Sleep(2000);
 
 	closesocket(clientSocket);
 	WSACleanup();

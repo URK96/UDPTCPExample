@@ -116,10 +116,11 @@ void TCPChatServer()
 	}
 
 	cout << "Server create success! Open server now..." << endl;
-	cout << "Server port number : " << serverPort << endl;
 
 	while (1)
 	{
+		cout << "Server port number : " << serverPort << endl;
+
         if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
 			printf("Server listen fail!\n");
 			closesocket(serverSocket);
@@ -153,14 +154,27 @@ void TCPChatServer()
                 break;
             }
 
-            cout << "Client send => " << buff << endl;
+            cout << "Client send => " << recvBuff << endl;
             cout << "Server send => ";
-            cin >> sendBuff;
+			cin.getline(sendBuff, BUFFERSIZE);
 
             send(clientSocket, sendBuff, BUFFERSIZE, 0);
+
+			if (!strcmp(sendBuff, "#exit"))
+			{
+				cout << "You exit chat server. Return to main menu..." << endl;
+				Sleep(1000);
+				closesocket(serverSocket);
+				closesocket(clientSocket);
+				WSACleanup();
+				system("cls");
+				return;
+			}
         }
 
 		Sleep(1000);
+
+		closesocket(clientSocket);
 
 		system("cls");
 	}
@@ -218,17 +232,23 @@ void TCPChatClient()
     while (1)
     {
         cout << "You send => ";
-        cin >> sendBuff;
+        cin.getline(sendBuff, BUFFERSIZE);
 
         send(clientSocket, sendBuff, BUFFERSIZE, 0);
 
         if (!strcmp(sendBuff, "#exit"))
         {
-            cout << "Exit chat server. Exit client mode..." << endl;
+            cout << "Exit chat server. Return to main menu..." << endl;
             break;
         }
 
         recv(clientSocket, recvBuff, BUFFERSIZE, 0);
+
+		if (!strcmp(recvBuff, "#exit"))
+		{
+			cout << "Server Exit chat server. Return to main menu..." << endl;
+			break;
+		}
 
         cout << "Server send => " << recvBuff << endl;
     }
@@ -248,10 +268,10 @@ int main(int argc, char* argv[])
 		switch (MainMenu())
 		{
 			case 1:
-				UDPFileServer();
+				TCPChatServer();
 				break;
 			case 2:
-				UDPFileClient();
+				TCPChatClient();
 				break;
 			case 3:
 				exit(1);
