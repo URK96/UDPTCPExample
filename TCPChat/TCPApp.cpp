@@ -1,21 +1,26 @@
-
-#define FILEPATHMAXLENGTH 255
+// Set common buffer size
 #define BUFFERSIZE 1024
 
 #include <cstdlib>
 #include <iostream>
 #include <WinSock2.h>
 
+// Disable warning code 4996
 #pragma comment (lib, "ws2_32.lib")
 #pragma warning(disable: 4996)
 
 using namespace std;
 
+// Define enum for mode
 typedef enum Type { Server, Client }Type;
 
 unsigned short serverPort = 0;
 unsigned short clientPort = 0;
 
+// Get port number to set port number value
+// Server port value : 1024 ~ 49151
+// Client port value : 49152 ~ 65535
+// Save value global variable (serverPort, clientPort)
 void GetPortNum(Type type, unsigned short min, unsigned short max)
 {
 	while (1)
@@ -43,6 +48,7 @@ void GetPortNum(Type type, unsigned short min, unsigned short max)
 	}
 }
 
+// Create and select menu interface
 int MainMenu()
 {
 	int num = 0;
@@ -70,10 +76,11 @@ int MainMenu()
 	}
 }
 
+// Working server mode
 void TCPChatServer()
 {
-	char recvBuff[BUFFERSIZE];
-    char sendBuff[BUFFERSIZE];
+	char recvBuff[BUFFERSIZE]; // Receive Buffer
+    char sendBuff[BUFFERSIZE]; // Send Buffer
 
 	GetPortNum(Server, 1024, 49151);
 
@@ -86,6 +93,7 @@ void TCPChatServer()
 	SOCKADDR_IN serverAddress;
 	SOCKADDR_IN clientAddress;
 
+	// Initialize Win Socket library
 	if (WSAStartup(0x202, &socketData) == SOCKET_ERROR)
 	{
 		cout << "Socket startup fail!" << endl;
@@ -93,12 +101,15 @@ void TCPChatServer()
 		exit(0);
 	}
 
+	// Set server protocol info. IP Address fix 127.0.0.1
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 	serverAddress.sin_port = htons(serverPort);
 
+	// Create server socket (TCP)
 	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
+	// Check validity of server socket
 	if (serverSocket == INVALID_SOCKET)
 	{
 		cout << "Cannot create socket!";
@@ -107,6 +118,7 @@ void TCPChatServer()
 		exit(0);
 	}
 
+	// Bind server socket
 	if (bind(serverSocket, (struct sockaddr*) & serverAddress, sizeof(serverAddress)) == SOCKET_ERROR)
 	{
 		printf("Cannot Bind.");
@@ -121,6 +133,7 @@ void TCPChatServer()
 	{
 		cout << "Server port number : " << serverPort << endl;
 
+		// Listen server
         if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
 			printf("Server listen fail!\n");
 			closesocket(serverSocket);
@@ -132,8 +145,10 @@ void TCPChatServer()
 
 		int clientAddressSize = sizeof(clientAddress);
 
+		// Accept client when client send request
         clientSocket = accept(serverSocket, (struct sockaddr*) & clientAddress, &clientAddressSize);
 
+		// Check validity of client socket
 		if (clientSocket == INVALID_SOCKET)
         {
 			cout << "Client accept fail! Return waiting...";
@@ -142,12 +157,14 @@ void TCPChatServer()
         }
 
 		cout << "Connect client!" << endl;
-		cout << "Client Address:Port = " << inet_ntoa(clientAddress.sin_addr) << ":" << htons(clientAddress.sin_port) << endl;
+		cout << "Client Address:Port = " << inet_ntoa(clientAddress.sin_addr) << ":" << htons(clientAddress.sin_port) << endl << endl;
+		cin.ignore(); // Clear console input buffer
 
         while (1)
         {
-            recv(clientSocket, recvBuff, BUFFERSIZE, 0);
+            recv(clientSocket, recvBuff, BUFFERSIZE, 0); // Receive client message
 
+			// If receive "#exit", close chat instance & return to wait. Chat server is not close.
             if (!strcmp(recvBuff, "#exit"))
             {
                 cout << "Client exit chat server. Return to waiting..." << endl;
@@ -156,10 +173,11 @@ void TCPChatServer()
 
             cout << "Client send => " << recvBuff << endl;
             cout << "Server send => ";
-			cin.getline(sendBuff, BUFFERSIZE);
+			cin.getline(sendBuff, BUFFERSIZE); // Get console input message
 
-            send(clientSocket, sendBuff, BUFFERSIZE, 0);
+            send(clientSocket, sendBuff, BUFFERSIZE, 0); // Send message to client
 
+			// If server input "#exit", close chat instance & close chat server. Return to main menu.
 			if (!strcmp(sendBuff, "#exit"))
 			{
 				cout << "You exit chat server. Return to main menu..." << endl;
@@ -180,11 +198,12 @@ void TCPChatServer()
 	}
 }
 
+// Working client mode
 void TCPChatClient()
 {
-	char recvBuff[BUFFERSIZE];
-    char sendBuff[BUFFERSIZE];
-	int connectPort = 0;
+	char recvBuff[BUFFERSIZE]; // Recieve buffer
+    char sendBuff[BUFFERSIZE]; // Send buffer
+	int connectPort = 0; // Store server port number
 
 	system("cls");
 	Sleep(1000);
@@ -194,6 +213,7 @@ void TCPChatClient()
 	SOCKADDR_IN targetServerAddress;
 	SOCKADDR_IN clientAddress;
 
+	// Initialize Win Socket library
 	if (WSAStartup(0x202, &socketData) == SOCKET_ERROR)
 	{
 		cout << "Socket startup fail!" << endl;
@@ -201,15 +221,19 @@ void TCPChatClient()
 		exit(0);
 	}
 
+	// Get server port to connect
 	cout << "Input server port number => ";
 	cin >> connectPort;
 
+	// Set target server protocol info. IP Address fix 127.0.0.1
 	targetServerAddress.sin_family = AF_INET;
 	targetServerAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 	targetServerAddress.sin_port = htons(connectPort);
 
+	// Create client socket (TCP)
 	clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 
+	// Check validity of client socket
 	if (clientSocket == INVALID_SOCKET)
 	{
 		cout << "Cannot create socket!";
@@ -218,32 +242,38 @@ void TCPChatClient()
 		exit(0);
 	}
 
+	// Connect target server
     if (connect(clientSocket, (struct sockaddr*) & targetServerAddress, sizeof(targetServerAddress)))
     {
         cout << "Cannot connet chat server!";
+		Sleep(1000);
 		closesocket(clientSocket);
 		WSACleanup();
+		system("cls");
 		return;
     }
 
 	cout << "Server connect success!" << endl;
-	cout << "Server port number : " << htons(targetServerAddress.sin_port) << endl;
+	cout << "Server port number : " << htons(targetServerAddress.sin_port) << endl << endl;
+	cin.ignore(); // Clear console input buffer
 
     while (1)
     {
         cout << "You send => ";
-        cin.getline(sendBuff, BUFFERSIZE);
+        cin.getline(sendBuff, BUFFERSIZE); // Get console input message
 
-        send(clientSocket, sendBuff, BUFFERSIZE, 0);
+        send(clientSocket, sendBuff, BUFFERSIZE, 0); // Send message to client
 
+		// If send "#exit", exit chat server & return to main menu.
         if (!strcmp(sendBuff, "#exit"))
         {
             cout << "Exit chat server. Return to main menu..." << endl;
             break;
         }
 
-        recv(clientSocket, recvBuff, BUFFERSIZE, 0);
+        recv(clientSocket, recvBuff, BUFFERSIZE, 0); // Receive client message
 
+		// If receive "#exit", close chat instance & return to wait. Chat server is not close.
 		if (!strcmp(recvBuff, "#exit"))
 		{
 			cout << "Server Exit chat server. Return to main menu..." << endl;

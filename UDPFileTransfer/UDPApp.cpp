@@ -1,4 +1,4 @@
-
+// Set common buffer size
 #define FILEPATHMAXLENGTH 255
 #define BUFFERSIZE 1024
 
@@ -6,16 +6,22 @@
 #include <iostream>
 #include <WinSock2.h>
 
+// Disable warning code 4996
 #pragma comment (lib, "ws2_32.lib")
 #pragma warning(disable: 4996)
 
 using namespace std;
 
+// Define enum for mode
 typedef enum Type { Server, Client }Type;
 
 unsigned short serverPort = 0;
 unsigned short clientPort = 0;
 
+// Get port number to set port number value
+// Server port value : 1024 ~ 49151
+// Client port value : 49152 ~ 65535
+// Save value global variable (serverPort, clientPort)
 void GetPortNum(Type type, unsigned short min, unsigned short max)
 {
 	while (1)
@@ -43,6 +49,7 @@ void GetPortNum(Type type, unsigned short min, unsigned short max)
 	}
 }
 
+// Create and select menu interface
 int MainMenu()
 {
 	int num = 0;
@@ -70,10 +77,11 @@ int MainMenu()
 	}
 }
 
+// Working server mode
 void UDPFileServer()
 {
-	char requestFile[FILEPATHMAXLENGTH];
-	char buff[BUFFERSIZE];
+	char requestFile[FILEPATHMAXLENGTH]; // Request file path buffer
+	char buff[BUFFERSIZE]; // Data buffer
 
 	GetPortNum(Server, 1024, 49151);
 
@@ -85,6 +93,7 @@ void UDPFileServer()
 	SOCKADDR_IN serverAddress;
 	SOCKADDR_IN clientAddress;
 
+	// Initialize Win Socket library
 	if (WSAStartup(0x202, &socketData) == SOCKET_ERROR)
 	{
 		cout << "Socket startup fail!" << endl;
@@ -92,12 +101,15 @@ void UDPFileServer()
 		exit(0);
 	}
 
+	// Set server protocol info. IP Address fix 127.0.0.1
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 	serverAddress.sin_port = htons(serverPort);
 
+	// Create server socket (UDP)
 	serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
+	// Check validity of server socket
 	if (serverSocket == INVALID_SOCKET)
 	{
 		cout << "Cannot create socket!";
@@ -106,6 +118,7 @@ void UDPFileServer()
 		exit(0);
 	}
 
+	// Bind server socket
 	if (bind(serverSocket, (struct sockaddr*) & serverAddress, sizeof(serverAddress)) == SOCKET_ERROR)
 	{
 		printf("Cannot Bind.");
@@ -123,12 +136,14 @@ void UDPFileServer()
 
 		int clientAddressSize = sizeof(clientAddress);
 
+		// Wait for client request
 		recvfrom(serverSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & clientAddress, &clientAddressSize);
 			
 		cout << "Connect client!" << endl;
 		cout << "Client Address:Port = " << inet_ntoa(clientAddress.sin_addr) << ":" << htons(clientAddress.sin_port) << endl;
 		cout << "Wait for client file request..." << endl;
 
+		// Recieve client request file path
 		recvfrom(serverSocket, requestFile, FILEPATHMAXLENGTH, 0, (struct sockaddr*) & clientAddress, &clientAddressSize);
 
 		cout << "Request File : " << requestFile << endl;
@@ -138,21 +153,25 @@ void UDPFileServer()
 		int readBytes;
 		int totalSendBytes = 0;
 
+		// Open file
 		if ((file = fopen(requestFile, "rb")) == NULL)
 		{
 			cout << "Cannot find file!";
 			continue;
 		}
 
+		// Check file size
 		fseek(file, 0, SEEK_END);
 		fileSize = ftell(file);
 		fseek(file, 0, SEEK_SET);
 
+		// Send file size
 		_snprintf(buff, sizeof(buff), "%d", fileSize);
 		sendto(serverSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
 
 		cout << "Start file tranfer" << endl;
 
+		// Read file data & send file data
 		while ((readBytes = fread(buff, sizeof(char), BUFFERSIZE, file)) > 0)
 		{
 			sendto(serverSocket, buff, readBytes, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
@@ -168,12 +187,13 @@ void UDPFileServer()
 	}
 }
 
+// Working client mode
 void UDPFileClient()
 {
-	char requestFile[FILEPATHMAXLENGTH];
-	char saveFile[FILEPATHMAXLENGTH];
-	char buff[BUFFERSIZE];
-	int connectPort = 0;
+	char requestFile[FILEPATHMAXLENGTH]; // Request file path buffer
+	char saveFile[FILEPATHMAXLENGTH]; // Save file path buffer
+	char buff[BUFFERSIZE]; // Data buffer
+	int connectPort = 0; // Store server port number
 
 	system("cls");
 	Sleep(1000);
@@ -183,6 +203,7 @@ void UDPFileClient()
 	SOCKADDR_IN serverAddress;
 	SOCKADDR_IN clientAddress;
 
+	// Initialize Win Socket library
 	if (WSAStartup(0x202, &socketData) == SOCKET_ERROR)
 	{
 		cout << "Socket startup fail!" << endl;
@@ -190,15 +211,19 @@ void UDPFileClient()
 		exit(0);
 	}
 
+	// Get server port to connect
 	cout << "Input server port number => ";
 	cin >> connectPort;
 
+	// Set server protocol info. IP Address fix 127.0.0.1
 	clientAddress.sin_family = AF_INET;
 	clientAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 	clientAddress.sin_port = htons(connectPort);
 
+	// Create client socket (UDP)
 	clientSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
+	// Check validity of client socket
 	if (clientSocket == INVALID_SOCKET)
 	{
 		cout << "Cannot create socket!";
@@ -212,17 +237,21 @@ void UDPFileClient()
 
 	int serverAddressSize = sizeof(serverAddress);
 
+	// Send connect request
 	sendto(clientSocket, "Connect", 8, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
 
+	// Input reqeust file path from server
 	cout << "Input want to receive file => ";
 	cin >> requestFile;
 
+	// Input save file path to client
 	cout << "Input want to save file => ";
 	cin >> saveFile;
 
 	cout << "Request File : " << requestFile << endl;
 	cout << "Save File : " << saveFile << endl;
 
+	// Send request file path to server
 	sendto(clientSocket, requestFile, FILEPATHMAXLENGTH, 0, (struct sockaddr*) & clientAddress, sizeof(clientAddress));
 
 	FILE* file;
@@ -231,18 +260,20 @@ void UDPFileClient()
 	int bufferSize = 0;
 	int totalRecvBytes = 0;
 
+	// Create file to recieve & save
 	if ((file = fopen(saveFile, "wb")) == NULL)
 	{
 		cout << "Cannot create file!";
 		return;
 	}
 
+	// Recieve file size
 	recvfrom(clientSocket, buff, BUFFERSIZE, 0, (struct sockaddr*) & serverAddress, &serverAddressSize);
-
 	fileSize = atol(buff);
 
 	cout << "Start file tranfer" << endl;
 
+	// Recieve file data & save
 	while (totalRecvBytes < fileSize)
 	{
 		if ((fileSize - totalRecvBytes) > BUFFERSIZE)
@@ -258,6 +289,7 @@ void UDPFileClient()
 
 	cout << "File transfer complete!" << endl;
 
+	// Close file stream
 	fflush(file);
 	fclose(file);
 
